@@ -16,6 +16,6 @@ The game uses an Arduino Uno, two push buttons, two player LEDs, five score LEDs
 
 The working prototype and core gameplay logic have been completed and tested. The current version supports automatic round progression, response-time comparison, score calculation, timeout handling, false-start penalties, round feedback, a final victory sequence, and button-controlled restart. Future improvements could include a custom enclosure, cleaner permanent wiring, adjustable difficulty, a best-reaction-time record, and a more detailed LCD interface.
 
-AI tools were used to assist with coding and debugging. The project concept, circuit construction, gameplay decisions, physical testing, and final implementation were completed and reviewed by the project creator.
+AI tools were used to assist with parts of the coding process and documentation. My responsibilities included debugging and refining the code, designing and completing the circuit wiring, assembling the breadboard prototype, integrating the physical components, testing the hardware, and troubleshooting the complete system. The gameplay decisions and final implementation were completed and reviewed by me.
 
 The project demonstration video will be added after compression is complete.
