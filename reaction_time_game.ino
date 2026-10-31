@@ -1,41 +1,39 @@
 /*
 * Two-Player Reaction Time Game v12
 * (Turn-based, Pin-13 godlike triple-flash, PWM fade)
-* 双人反应速度对战游戏 v12(轮流制,6个分数LED,PWM渐亮,超神专属音效)
 * Board: Arduino Uno
 * Button wired to 5V with 10k pull-down resistor (pressed = HIGH)
-* 按钮接5V + 10kΩ下拉电阻(按下 = 高电平)
 *
-* Wiring 接线:
-* Button (shared 共用) -> Pin 3
-* LED P1 (left 左) -> Pin 4 LED P2 (right 右) -> Pin 5
-* Score LEDs 分数LED -> Pin 6,7,8,9,10,13 (left to right 从左到右)
+* Wiring:
+* Shared button -> Pin 3
+* P1 LED (left) -> Pin 4; P2 LED (right) -> Pin 5
+* Score LEDs -> Pins 6, 7, 8, 9, 10, 13 (left to right)
 * Start buzzer -> Pin 11 Victory buzzer -> Pin 12
 *
-* Scoring 计分 (your own reaction time 自己的反应时间):
-* <=125ms -> 6 pts (godlike 超神), <=150 -> 5, <=200 -> 4,
+* Scoring (based on each player's reaction time):
+* <=125ms -> 6 pts (Godlike), <=150 -> 5, <=200 -> 4,
 * <=300 -> 3, <=500 -> 2, slower -> 1
-* False start / timeout 抢跑或超时 -> 0
+* False start or timeout -> 0
 */
 
-// ---------------- Pin definitions 引脚定义 ----------------
-const int BTN = 3; // shared button 共用按钮
-const int LED_P1 = 4; // left 左
-const int LED_P2 = 5; // right 右
+// ---------------- Pin definitions ----------------
+const int BTN = 3; // shared button
+const int LED_P1 = 4; // left
+const int LED_P2 = 5; // right
 const int NUM_SCORE_LEDS = 6;
 const int SCORE_LEDS[NUM_SCORE_LEDS] = {6, 7, 8, 9, 10, 13};
 const int BUZZER_START = 11;
 const int BUZZER_VICTORY = 12;
 
-// ---------------- Game settings 游戏设置 ----------------
-const int TOTAL_ROUNDS = 5; // number of rounds 总轮数
-const unsigned long TIMEOUT_MS = 5000; // press window after buzzer 响后按键时限
+// ---------------- Game settings ----------------
+const int TOTAL_ROUNDS = 5; // number of rounds
+const unsigned long TIMEOUT_MS = 5000; // response window after the buzzer
 
-// Your own reaction time (ms) -> points 自己的反应时间(毫秒) -> 得分
-// <=125 -> 6 pts, <=150 -> 5, <=200 -> 4, <=300 -> 3, <=500 -> 2, else 1
+// Reaction time (ms) -> points
+// <=125 -> 6, <=150 -> 5, <=200 -> 4, <=300 -> 3, <=500 -> 2, else 1
 const unsigned long TIME_THRESHOLDS[5] = {125, 150, 200, 300, 500};
 
-// ---------------- Game state 游戏状态 ----------------
+// ---------------- Game state ----------------
 int scoreP1 = 0;
 int scoreP2 = 0;
 
@@ -65,20 +63,20 @@ Serial.print(F("--- Round 第 "));
 Serial.print(round);
 Serial.println(F(" 轮 ---"));
 
-// P1's turn: play, then score immediately P1回合:玩完立刻计分
+// Play P1's turn and score it immediately.
 unsigned long timeP1 = playTurn(1);
 int pointsP1 = (timeP1 < TIMEOUT_MS) ? timeToPoints(timeP1) : 0;
 scoreP1 += pointsP1;
 reportPoints(1, timeP1, pointsP1);
 delay(1000);
 
-// P2's turn: play, then score immediately P2回合:玩完立刻计分
+// Play P2's turn and score it immediately.
 unsigned long timeP2 = playTurn(2);
 int pointsP2 = (timeP2 < TIMEOUT_MS) ? timeToPoints(timeP2) : 0;
 scoreP2 += pointsP2;
 reportPoints(2, timeP2, pointsP2);
 
-// Round-winner cue: faster player's LED flashes 本轮更快者LED闪两下
+// Flash the faster player's LED twice.
 if (timeP1 < timeP2) flashPlayerLED(1, 2);
 else if (timeP2 < timeP1) flashPlayerLED(2, 2);
 
@@ -95,16 +93,15 @@ delay(500);
 }
 
 // ============================================================
-// One player's turn. Returns reaction time in ms (TIMEOUT_MS = failed).
-// 单人回合,返回反应时间(毫秒);抢跑或超时返回TIMEOUT_MS(记0分)
+// Run one player's turn and return the reaction time in milliseconds.
+// A false start or timeout returns TIMEOUT_MS and earns zero points.
 unsigned long playTurn(int player) {
 int led = (player == 1) ? LED_P1 : LED_P2;
 
 Serial.print(F("P")); Serial.print(player);
 Serial.println(F("'s turn 的回合"));
 
-// 1. "Your turn" cue: this player's LED flashes 3 times + short beeps
-// 轮次提示:该玩家的LED闪3下配短滴声
+// 1. Signal the active player with three LED flashes and short beeps.
 for (int i = 0; i < 3; i++) {
 digitalWrite(led, HIGH);
 tone(BUZZER_START, 600, 80);
@@ -113,11 +110,10 @@ digitalWrite(led, LOW);
 delay(180);
 }
 
-// Wait until button is released 确保按钮已松开
+// Wait until the button is released.
 while (digitalRead(BTN) == HIGH) delay(10);
 
-// 2. Random wait (2-5 s) with false-start detection
-// 随机等待2-5秒,检测抢跑
+// 2. Wait a random 2-5 seconds while checking for a false start.
 unsigned long waitTime = random(2000, 5001);
 unsigned long waitStart = millis();
 while (millis() - waitStart < waitTime) {
@@ -133,15 +129,15 @@ return TIMEOUT_MS;
 }
 }
 
-// 3. GO signal: loud beep near buzzer resonance 开始信号(共振频率更响)
+// 3. Play a loud GO signal near the buzzer's resonant frequency.
 tone(BUZZER_START, 2500, 400);
 unsigned long goTime = millis();
 
-// 4. Measure reaction time 测反应时间
+// 4. Measure reaction time.
 while (millis() - goTime < TIMEOUT_MS) {
 if (digitalRead(BTN) == HIGH) {
 unsigned long t = millis() - goTime;
-digitalWrite(led, HIGH); // instant feedback 即时反馈
+digitalWrite(led, HIGH); // instant feedback
 delay(500);
 digitalWrite(led, LOW);
 while (digitalRead(BTN) == HIGH) delay(10);
@@ -149,15 +145,14 @@ return t;
 }
 }
 
-// Timeout 超时
+// Timeout
 Serial.println(F("Too slow! 0 points. 超时!0分"));
 errorBeep();
 return TIMEOUT_MS;
 }
 
 // ============================================================
-// Print result and show points on the score LEDs
-// 打印成绩并在分数LED上显示得分
+// Print the result and show points on the score LEDs.
 void reportPoints(int player, unsigned long t, int points) {
 Serial.print(F("P")); Serial.print(player);
 if (t < TIMEOUT_MS) {
@@ -170,9 +165,9 @@ if (points > 0) showScoreLEDs(points);
 }
 
 // ============================================================
-// Your own time -> points: faster = more 越快分越高
+// Convert reaction time to points; faster reactions earn more.
 int timeToPoints(unsigned long t) {
-if (t <= TIME_THRESHOLDS[0]) return 6; // godlike 超神档
+if (t <= TIME_THRESHOLDS[0]) return 6; // Godlike level
 if (t <= TIME_THRESHOLDS[1]) return 5;
 if (t <= TIME_THRESHOLDS[2]) return 4;
 if (t <= TIME_THRESHOLDS[3]) return 3;
@@ -181,25 +176,23 @@ return 1;
 }
 
 // ============================================================
-// Score LEDs: first 5 fade in; the 6th point makes the Pin-13 LED flash 3x
-// 分数LED:前5个渐亮;第6分由Pin 13的灯单独快闪3下
+// Fade in the first five score LEDs; the sixth flashes three times.
 void showScoreLEDs(int points) {
 int fadeCount = (points > 5) ? 5 : points;
 for (int i = 0; i < fadeCount; i++) {
 tone(BUZZER_START, 800 + i * 200, 100);
-fadeInLED(SCORE_LEDS[i], 350); // each fades in over 350ms 每个用350ms渐亮
+fadeInLED(SCORE_LEDS[i], 350); // fade in each LED over 350 ms
 }
 if (points >= 6) {
 delay(200);
-godlikeFlash(); // 6th LED flashes 3x 第六灯快闪3下
+godlikeFlash(); // flash the sixth LED three times
 }
 delay(1000);
-fadeOutAll((points >= 6) ? 6 : fadeCount, 500); // all fade out together 一起渐灭
+fadeOutAll((points >= 6) ? 6 : fadeCount, 500); // fade out all lit LEDs together
 }
 
 // ============================================================
-// Godlike: Pin-13 LED flashes 3 times with ascending riff, then stays on
-// 超神特效:Pin 13的灯快闪3下配上行音效,闪完保持亮
+// Godlike effect: flash the Pin 13 LED three times with an ascending riff.
 void godlikeFlash() {
 int notes[] = {1047, 1319, 1568}; // C6 E6 G6
 for (int i = 0; i < 3; i++) {
@@ -209,17 +202,17 @@ delay(150);
 digitalWrite(SCORE_LEDS[5], LOW);
 delay(120);
 }
-digitalWrite(SCORE_LEDS[5], HIGH); // stay on until fade-out 保持亮到渐灭
-tone(BUZZER_VICTORY, 1568, 300); // hold note 收尾长音
+digitalWrite(SCORE_LEDS[5], HIGH); // stay on until fade-out
+tone(BUZZER_VICTORY, 1568, 300); // finish with a sustained note
 delay(300);
 }
 
 // ============================================================
-// Software PWM fade-in on any pin 任意引脚软件PWM渐亮
-// Quadratic curve so it LOOKS linear to the eye 二次曲线让肉眼看起来均匀
+// Software PWM fade-in for any digital pin.
+// Use a quadratic curve so the fade appears linear to the eye.
 void fadeInLED(int pin, int durationMs) {
 const int steps = 40;
-const long periodUs = 2000; // 2ms period (~500Hz, no flicker) 无闪烁
+const long periodUs = 2000; // 2 ms period (~500 Hz, no visible flicker)
 for (int s = 1; s <= steps; s++) {
 long onUs = periodUs * s * s / ((long)steps * steps);
 unsigned long stepEnd = millis() + durationMs / steps;
@@ -232,11 +225,11 @@ digitalWrite(pin, LOW);
 delayMicroseconds(periodUs - onUs);
 }
 }
-digitalWrite(pin, HIGH); // end fully on 结束保持全亮
+digitalWrite(pin, HIGH); // finish at full brightness
 }
 
 // ============================================================
-// Fade out the first N score LEDs together 前N个分数LED一起渐灭
+// Fade out the first N score LEDs together.
 void fadeOutAll(int count, int durationMs) {
 const int steps = 40;
 const long periodUs = 2000;
@@ -306,7 +299,7 @@ digitalWrite(winnerLED, LOW); setAllScoreLEDs(LOW); delay(150);
 }
 
 // ============================================================
-// Helpers 辅助函数
+// Helper functions
 void setAllScoreLEDs(int state) {
 for (int i = 0; i < NUM_SCORE_LEDS; i++) digitalWrite(SCORE_LEDS[i], state);
 }
